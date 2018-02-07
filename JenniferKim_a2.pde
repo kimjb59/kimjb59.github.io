@@ -26,7 +26,7 @@ void setup() {
   graph = new BarGraph(data);
   transitionDone = new boolean[numDataPoints];
   size(800, 800);
-  surface.setResizable(true);
+  //surface.setResizable(true);
   rectMode(CENTER);
 }
 
