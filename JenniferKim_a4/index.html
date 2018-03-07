@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <title>Assignment 4: Electoral Map</title>
+    <script src="https://d3js.org/d3.v4.js"></script>
+    <script src="box-model.js"></script>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 12px;
+        }
+
+        .timeline {
+            stroke: lightslategray;
+        }
+
+        .legend {
+            font-size: 0.8em;
+            text-anchor: middle;
+        }
+
+        .tooltip {
+            outline: 2px solid gainsboro;
+            position: absolute;
+            visibility: hidden;
+            z-index: 10;
+            background-color: white;
+            padding: 5px;
+            box-shadow: 0 0 4px 2px gainsboro;
+        }
+
+        .rep {
+            fill: #DE2D26;
+            color: #DE2D26;
+            stroke: none;
+        }
+
+        .dem {
+            fill: #3182BD;
+            color: #3182BD;
+            stroke: none;
+        }
+
+        .label {
+            fill: #775D4F;
+        }
+    </style>
+</head>
+
+<body>
+    <script type="text/javascript">
+        function gridData(data) {
+            // Sort data by row then column
+            data.sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+
+            let grid = [];
+            let stateIndex = 0;
+
+            // iterate for rows	
+            for (let row = 0; row < 8; row++) {
+                grid.push([]);
+
+                // iterate for cells/columns inside rows
+                for (let col = 0; col < 12; col++) {
+                    let state = data[stateIndex];
+                    if (stateIndex < 51 && state.x == col && state.y == row) {
+                        grid[row].push(state);
+                        stateIndex++;
+                    }
+                    else {
+                        grid[row].push({
+                            state: "",
+                            abbr: "",
+                            y: row,
+                            x: col,
+                        });
+                    }
+                }
+            }
+
+            return grid;
+        }
+
+        function applyElectionData(grid, electionData) {
+            // Map state abbreviation to election result object
+            let electionDataMap = {};
+            for (let i = 0; i < electionData.length; ++i) {
+                let electionResult = electionData[i];
+                let state = electionResult.Abbreviation;
+                electionDataMap[state] = electionResult;
+            }
+
+            // Add empty object for when there is no state
+            electionDataMap[""] = {
+                State: "",
+                Abbreviation: "",
+                Total_EV: "",
+                D_Nominee: "",
+                D_Percentage: "",
+                D_Votes: "",
+                R_Nominee: "",
+                R_Percentage: "",
+                R_Votes: "",
+                Year: ""
+            };
+
+            // Insert election result object into grid cells iff
+            // state abbreviations match
+            for (let i = 0; i < grid.length; ++i) {
+                for (let j = 0; j < grid[0].length; ++j) {
+                    let cell = grid[i][j];
+                    // If electionDataMapi{state] doe snot exist use current
+                    // map and soemhow flag it as not in current datasep.
+                    let state = cell.abbr;
+                    let result = electionDataMap[state];
+
+                    // If no data for this state in our map of state to result,
+                    // then this state is not in the data for this year
+                    if (result === undefined) {
+                        result = cell.electionResult
+                        result.active = false;
+                    }
+                    cell.electionResult = result;
+                }
+            }
+        }
+
+        function getStateColor(stateInfo, scale) {
+            if (stateInfo.electionResult.active == false) {
+                return NO_STATE_DATA;
+            }
+
+            if (stateInfo.abbr == "") {
+                return EMPTY;
+            }
+            let electionResult = stateInfo.electionResult;
+            let diff = electionResult.R_Percentage - electionResult.D_Percentage;
+            return scale(diff);
+        }
+
+        function formatName(name) {
+            return name
+                .toLowerCase()
+                .split(" ")
+                .map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); })
+                .join(" ");
+        }
+
+        function winningParty(electionResult) {
+            if (parseFloat(electionResult.D_Percentage) > parseFloat(electionResult.R_Percentage)) {
+                return DEMOCRAT;
+            }
+            return REPUBLICAN;
+        }
+
+        function formatLargeInt(num) {
+            num = num.replace(/,/g, "");
+            return d3.format(",")(num);
+        }
+
+        // ==================
+        //
+        // END METHODS
+        //
+        // ==================
+
+        const DATA_FOLDER = "yearwise-election-results/data/";
+
+        const SVG_WIDTH = 1240;
+        const SVG_HEIGHT = 640;
+
+        const HUES = ["#063E78", "#08519C", "#3182BD", "#6BAED6", "#9ECAE1", "#C6DBEF",
+            "#FCBBA1", "#FC9272", "#FB6A4A", "#DE2D26", "#A50F15", "#860408"];
+
+        const EMPTY = "white";
+        const NO_STATE_DATA = "lightgray";
+
+        const DEMOCRAT = "dem";
+        const REPUBLICAN = "rep";
+
+        // ==================
+        //
+        // END CONSTANTS
+        //
+        // ==================
+
+        let mapBox = new BoxModel()
+            .withParentWidth(SVG_WIDTH)
+            .withParentHeight(SVG_HEIGHT)
+            .withMargins(200, 350, 20, 20);
+
+        let legendBox = new BoxModel()
+            .withParentWidth(SVG_WIDTH)
+            .withParentHeight(SVG_HEIGHT)
+            .withMargins(150, 100, SVG_HEIGHT - 150, 100);
+
+        let timelineBox = new BoxModel()
+            .withParentWidth(SVG_WIDTH)
+            .withParentHeight(SVG_HEIGHT)
+            .withMargins(75, 10, SVG_HEIGHT - 75, 10);
+
+        let portraitBox = new BoxModel()
+            .withParentWidth(SVG_WIDTH)
+            .withParentHeight(SVG_HEIGHT)
+            .withMargins(250, 20, 20, SVG_WIDTH - 300);
+
+        // ===================
+        //
+        // END BOX MODELS
+        //
+        // ===================
+
+        let xScale = d3.scaleBand()
+            .domain(d3.range(12))
+            .range([0, mapBox.width])
+            .padding(0.05);
+
+        let yScale = d3.scaleBand()
+            .domain(d3.range(8))
+            .range([0, mapBox.height])
+            .padding(0.05);
+
+        let colorScale = d3.scaleQuantile()
+            .domain([-60, 60])
+            .range(HUES);
+
+        let legendDomain = d3.range(HUES.length);
+        let legendScale = d3.scaleBand()
+            .domain(legendDomain)
+            .range([0, legendBox.width])
+            .padding(0.025);
+
+        let timelineScale = d3.scalePoint()
+            .domain(d3.range(1940, 2017, 4))
+            .range([0, timelineBox.width])
+            .padding(20);
+
+        // ====================
+        //
+        // END SUPPORTING FUNCTIONS
+        //
+        // ====================
+
+        let tooltip = d3.select("body")
+            .append("div")
+            .attr("class", "tooltip");
+
+        let svg = d3.select("body").append("svg")
+            .attr("width", SVG_WIDTH)
+            .attr("height", SVG_HEIGHT);
+
+        svg.append("text")
+            .attr("font-size", "40")
+            .attr("y", 40)
+            .text("U.S. Presidential Elections from 1940 to 2016");
+
+        let timeline = svg.append("g")
+            .attr("class", "timeline")
+            .attr("transform", "translate(" + timelineBox.margin.left + "," + timelineBox.margin.top + ")");
+
+        timeline.append("line")
+            .attr("x1", 0).attr("y1", timelineBox.height / 2)
+            .attr("x2", timelineBox.width).attr("y2", timelineBox.height / 2)
+            .attr("stroke-dasharray", "1.5, 4")
+            .style("stroke", "black");
+
+        let legend = svg.append("g")
+            .attr("class", "legend")
+            .attr("transform", "translate(" + legendBox.margin.left + "," + legendBox.margin.top + ")")
+            .selectAll(".legend")
+            .data(legendDomain)
+            .enter()
+            .append("g")
+            .attr("transform", function (d) { return "translate(" + legendScale(d) + ",0)"; });
+
+        legend.append("rect")
+            .attr("width", legendScale.bandwidth())
+            .attr("height", 8)
+            .attr("fill", function (d) { return HUES[d]; });
+
+        let low = -60;
+        let highs = colorScale.quantiles();
+        legend.append("text")
+            .text(function (d) {
+                let high = highs[d] != null ? highs[d] : 60;
+                let range = low + " to " + high;
+                low = high;
+                return range;
+            })
+            .attr("x", legendScale.bandwidth() / 2)
+            .attr("y", 20);
+
+        let map = svg.append("g")
+            .attr("transform", "translate(" + mapBox.margin.left + "," + mapBox.margin.top + ")")
+            .attr("class", "map");
+
+        // The current year to display
+        let currentYear = 2012;
+
+        let portrait = svg.append("g")
+            .attr("class", "portrait")
+            .attr("transform", "translate(" + portraitBox.margin.left + "," + portraitBox.margin.top + ")");
+        portrait.append("image");
+
+        // The grid object holds the complete map data
+        let grid;
+
+        d3.csv("states.csv", function (data) {
+            grid = gridData(data);
+        });
+
+        d3.queue()
+            .defer(d3.csv, DATA_FOLDER + "election-results-2012.csv")
+            .await(updateMap);
+
+        d3.queue()
+            .defer(d3.csv, DATA_FOLDER + "yearwise-winner.csv")
+            .await(drawTimeline);
+
+        function drawTimeline(error, winnerData) {
+            timeline = timeline.selectAll(".year-button")
+                .data(winnerData)
+                .enter()
+                .append("g")
+                .attr("class", "year-button");
+
+            timeline.append("circle")
+                .attr("class", function (d) { return d.PARTY == "D" ? DEMOCRAT : REPUBLICAN; })
+                .attr("cx", function (d) { return timelineScale(d.YEAR); })
+                .attr("cy", 0)
+                .attr("r", getTimelineButtonSize);
+
+            timeline.append("text")
+                .style("text-anchor", "middle")
+                .attr("x", function (d) { return timelineScale(d.YEAR); })
+                .attr("y", getTimelineLabelY)
+                .text(function (d) { return d.YEAR; });
+
+            // New selection if we click on the box enclosing the button
+            // and the label
+            timeline.on("click", function (d) {
+                currentYear = d.YEAR;
+                d3.queue()
+                    .defer(d3.csv, DATA_FOLDER + "election-results-" + d.YEAR + ".csv")
+                    .await(updateMap);
+                // Redraw the timeline
+                updateTimeline();
+            });
+        }
+
+        function updateTimeline() {
+            timeline.selectAll("circle")
+                .attr("r", getTimelineButtonSize);
+            timeline.selectAll("text")
+                .attr("y", getTimelineLabelY);
+        }
+
+        function getTimelineButtonSize(d) {
+            return d.YEAR == currentYear ? 16 : 8;
+        }
+
+        function getTimelineLabelY(d) {
+            return d.YEAR == currentYear ? 31 : 23;
+        }
+
+        function updateMap(error, electionData) {
+            applyElectionData(grid, electionData);
+            drawMap();
+            updatePortrait();
+        }
+
+        function updatePortrait() {
+            portrait.select("image")
+                .attr("xlink:href", "portraits/" + currentYear + ".jpg");
+        }
+
+        function getTotalElectoralVotes(d) {
+            if (d.electionResult.active == false) {
+                return "";
+            }
+            return d.electionResult.Total_EV;
+        }
+        
+        function drawMap() {
+            // Update existing map
+            svg.selectAll(".cell > rect")
+                .attr("fill", function (d) { return getStateColor(d, colorScale); });
+            svg.selectAll(".electoral-votes")
+                .text(getTotalElectoralVotes)
+
+            // How to draw new map
+            let row = map.selectAll(".row")
+                .data(grid)
+                .enter()
+                .append("g")
+                .attr("class", "row");
+
+            let cell = row.selectAll(".cell")
+                .data(function (d) { return d; })
+                .enter()
+                .append("g")
+                .attr("class", "cell");
+
+            cell.append("rect")
+                .attr("x", function (d) { return xScale(d.x); })
+                .attr("y", function (d) { return yScale(d.y); })
+                .attr("width", xScale.bandwidth())
+                .attr("height", yScale.bandwidth())
+                .attr("fill", function (d) { return getStateColor(d, colorScale); });
+
+            let label = cell.append("text")
+                .attr("class", "label")
+                .style("text-anchor", "middle");
+            label.append("tspan")
+                .attr("x", function (d) { return xScale(d.x) + xScale.bandwidth() / 2; })
+                .attr("y", function (d) {
+                    let factor = 8;
+                    if (d.electionResult.active == false) {
+                        factor = 4;
+                    }
+                    return yScale(d.y) + yScale.bandwidth() / factor;
+                })
+                .attr("dy", "1.2em")
+                .text(function (d) { return d.abbr; });
+            label.append("tspan")
+                .attr("class", "electoral-votes")
+                .attr("x", function (d) { return xScale(d.x) + xScale.bandwidth() / 2; })
+                .attr("y", function (d) { return yScale(d.y) + yScale.bandwidth() / 2; })
+                .attr("dy", "1.2em")
+                .text(getTotalElectoralVotes);
+
+            cell
+                .on("mouseover", function (d) {
+                    let stateInfo = d.electionResult;
+                    let party = "";
+                    if (stateInfo.Abbreviation != "") {
+                        let infoHtml = "";
+                        if (stateInfo.active == false) {
+                            infoHtml = "<h2>" + stateInfo.State + "</h2>"
+                                + "<p>No data for this year</p>";
+                        }
+                        else {
+                            party = winningParty(stateInfo);
+                            infoHtml = "<h2 class='" + party + "'>" + stateInfo.State + "</h2>"
+                                + "<p>Electoral Votes: " + stateInfo.Total_EV + "</p>"
+                                + "<ul><li class='" + DEMOCRAT + "'>"
+                                + formatName(stateInfo.D_Nominee) + ": "
+                                + formatLargeInt(stateInfo.D_Votes)
+                                + " (" + stateInfo.D_Percentage + "%)</li>"
+                                + "<li class='" + REPUBLICAN + "'>"
+                                + formatName(stateInfo.R_Nominee) + ": "
+                                + formatLargeInt(stateInfo.R_Votes)
+                                + " (" + stateInfo.R_Percentage + "%)</li></ul>";
+                        }
+
+                        tooltip.style("visibility", "visible")
+                            .html(infoHtml);
+                    }
+                })
+                .on("mousemove", function () {
+                    tooltip.style("top", (d3.event.pageY - 10) + "px")
+                        .style("left", (d3.event.pageX + 10) + "px");
+                })
+                .on("mouseout", function () { tooltip.style("visibility", "hidden"); });
+        }
+    </script>
+</body>
+
+</html>
