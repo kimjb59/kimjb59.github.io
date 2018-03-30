@@ -1,5 +1,5 @@
 const SVG_BOX = {
-    width: 500, height: 800,
+    width: 500, height: 700,
     top: 30, left: 50, bottom: 30, right: 50
 }
 
