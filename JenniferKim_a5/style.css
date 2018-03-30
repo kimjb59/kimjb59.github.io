@@ -1,0 +1,129 @@
+body {
+    font-family: "Lato", sans-serif;
+}
+
+h1 {
+    color: #005689;
+}
+
+#vis {
+    height: 100%;
+    width: 55%;
+    position: fixed;
+    z-index: 1;
+    top: 0;
+    left: 45%;
+    overflow-x: hidden;
+    padding-top: 20px;
+    margin-left: 1%;
+}
+
+.main {
+    width: 45%;
+    margin-right: 55%;
+    font-size: 18px;
+    padding: 0px 0px;
+    float: left;
+}
+
+.background {
+    fill-opacity: 0.1;
+    display: block;
+    margin: auto;
+}
+
+.slopegraph {
+    height: 100%;
+    width: 960px;
+    position: fixed;
+    z-index: 1;
+    overflow-x: hidden;
+}
+
+text {
+    font-family: "Helvitica Neue", sans-serif;
+    font-size: 11px;
+}
+
+.vis-title {
+    text-anchor: middle;
+    font-size: 24px;
+    fill: #005689;
+}
+
+.ticks {
+    font-size: 11px;
+}
+
+.track {
+    stroke: #000;
+    stroke-opacity: 0.5;
+}
+
+.track-inset {
+    stroke: #ddd;
+    stroke-width: 8px;
+}
+
+.selected {
+    fill: orange;
+}
+.before .selected {
+    font-weight: bold;
+}
+
+.after .selected {
+    font-weight: bold;
+}
+
+.handle {
+    fill: #fff;
+    stroke: #000;
+    stroke-opacity: 0.5;
+    stroke-width: 2.5px;
+    cursor: ns-resize;
+}
+
+.handle:hover {
+    fill: lightgray;
+}
+
+.handle:active {
+    fill: darkgray;
+}
+
+.tooltip {
+    fill: white;
+    stroke: darkslategray;
+}
+
+.tooltip text {
+    text-anchor: middle;
+    fill: black;
+    stroke: none;
+}
+
+.slopegraph-line {
+    stroke-width: 1;
+}
+
+.slopegraph-line.increase {
+    stroke: crimson;
+}
+
+.slopegraph-line.decrease {
+    stroke: dodgerblue;
+}
+
+.context-menu rect {
+    fill: white;
+    stroke: black;
+}
+
+.context-menu:hover rect {
+    fill: lightgray;
+}
+
+.context-menu:active rect {
+    fill: gray;
+}
