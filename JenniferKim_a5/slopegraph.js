@@ -42,7 +42,7 @@ svg.append("text")
     .text("Total Medal Counts per Games by Country");
 
 // Background
-d3.xml("flags/olympic-games.svg").mimeType("image/svg+xml").get(function (xml) {
+d3.xml("olympic-games.svg").mimeType("image/svg+xml").get(function (xml) {
     d3.select(d3.select("div#vis").node().appendChild(xml.documentElement))
         .attr("class", "background")
         .attr("width", SVG_BOX.width)
